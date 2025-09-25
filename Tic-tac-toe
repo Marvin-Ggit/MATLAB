@@ -1,0 +1,221 @@
+function tic_tac_toe()
+    % 初始化棋盘
+    board = zeros(3, 3);
+    game_over = false;
+    
+    disp('===== 井字棋游戏 =====');
+    disp('位置编号与棋盘对应关系：');
+    disp('1（左上） 2（中上） 3（右上）');
+    disp('4（左中） 5（中心） 6（右中）');
+    disp('7（左下） 8（中下） 9（右下）');
+    disp('玩家1（X）请输入落子位置（1-9）');
+    pos_map = [
+    1 1;  % 位置1 → (1,1)
+    1 2;  % 位置2 → (1,2)
+    1 3;  % 位置3 → (1,3)
+    2 1;  % 位置4 → (2,1)
+    2 2;  % 位置5 → (2,2)
+    2 3;  % 位置6 → (2,3)
+    3 1;  % 位置7 → (3,1)
+    3 2;  % 位置8 → (3,2)
+    3 3]; % 位置9 → (3,3)
+
+
+    % 游戏主循环
+    while ~game_over
+        % 玩家1回合（输入验证优化）
+        while true
+            move_str = input('请输入位置（1-9）：', 's');
+            if isempty(move_str) || ~all(ismember(move_str, '123456789'))
+                disp('请输入1-9的有效数字！');
+                continue;
+            end
+            move = str2double(move_str);
+            row = pos_map(move, 1);
+            col = pos_map(move, 2);
+            if board(row, col) ~= 0
+                disp('该位置已被占用！');
+            else
+                board(row, col) = 1;
+                break;
+            end
+        end
+
+        % 显示棋盘与得分
+        display_board(board);
+        [score, game_over] = evaluateBoard(board);
+        disp(['当前得分：玩家1: ' num2str(score(1)) ' | 玩家2:' num2str(score(2))]);
+        if game_over, break; end
+
+        % 玩家2回合（程序落子，优化提示）
+        disp('程序正在思考...');
+        pause(3);
+        best_move = minimax(board);
+        row = ceil(best_move / 3);
+        col = mod(best_move, 3);
+        if col == 0
+            col = 3;
+        end
+        board(row, col) = -1;
+
+        % 显示棋盘与得分
+        display_board(board);
+        [score, game_over] = evaluateBoard(board);
+        disp(['当前得分：玩家1:' num2str(score(1)) ' | 玩家2: ' num2str(score(2))]);
+    end
+
+    % 结局判断（简化逻辑）
+    if score(1) == 10
+        disp('玩家1获得MVP！');
+    elseif score(2) == 10
+        disp('菜就多练！');
+    else
+        disp('棋逢对手，将遇良才，本次平局！');
+    end
+
+    % 询问是否重启（新增功能）
+    if input('是否重新开始？（1=是，0=否）：', 's') == '1'
+        tic_tac_toe();
+    end
+end
+
+% 显示棋盘（保持不变）
+function display_board(board)
+    disp('当前棋盘状态：');
+    for i = 1:3
+        row_str = [];
+        for j = 1:3
+            if board(i,j) == 1
+                row_str = [row_str, ' X '];
+            elseif board(i,j) == -1
+                row_str = [row_str, ' O '];
+            else
+                row_str = [row_str, ' . '];
+            end
+        end
+        disp(row_str);
+    end
+end
+
+
+function [score, game_over] = evaluateBoard(board)
+    game_over = false;
+    score = zeros(1,2);
+
+    % 检查行、列、对角线（提前return）
+    for i = 1:3
+        if sum(board(i,:)) == 3 || sum(board(:,i)) == 3
+            score = [10, 0]; 
+            game_over = true; 
+            return;
+        end
+        if sum(board(i,:)) == -3 || sum(board(:,i)) == -3
+            score = [0, 10]; 
+            game_over = true; 
+            return;
+        end
+    end
+    if sum(diag(board)) == 3 || sum(diag(fliplr(board))) == 3
+        score = [10, 0]; 
+        game_over = true; 
+        return;
+    end
+    if sum(diag(board)) == -3 || sum(diag(fliplr(board))) == -3
+        score = [0, 10]; 
+        game_over = true; 
+        return;
+    end
+
+    % 检查平局
+    if sum(board(:) == 0) == 0
+        score = [0, 0]; 
+        game_over = true; 
+        return;
+    end
+
+    % 计算非终局得分（仅在未结束时执行）
+    position_weights = [2,0,2;0,4,0;2,0,2];
+    lines = [board(1,:); board(2,:); board(3,:); board(:,1)'; board(:,2)'; board(:,3)'; diag(board)'; diag(fliplr(board))'];
+    player1_double = 0;
+    player2_double = 0;
+    for i = 1:8
+        if sum(lines(i,:)) == 2 
+            player1_double = player1_double + 5;
+        end
+        if sum(lines(i,:)) == -2 
+            player2_double = player2_double + 5;
+        end
+    end
+    board_1 = board;
+    board_2 = board;
+    board_1(board_1<0)=0;
+    board_2(board_2>0)=0;
+    player1_position = sum(sum(board_1.* position_weights)); % 向量化计算位置得分
+    player2_position = -sum(sum(board_2.* position_weights));
+    score(1) = player1_double + player1_position;
+    score(2) = player2_double + player2_position;
+
+end
+
+
+function best_move = minimax(board)
+    available_moves = find(board' == 0);
+    num_moves = length(available_moves);
+    best_score = inf;
+    best_move = available_moves(1);
+    pos_map = [
+    1 1;  % 位置1 → (1,1)
+    1 2;  % 位置2 → (1,2)
+    1 3;  % 位置3 → (1,3)
+    2 1;  % 位置4 → (2,1)
+    2 2;  % 位置5 → (2,2)
+    2 3;  % 位置6 → (2,3)
+    3 1;  % 位置7 → (3,1)
+    3 2;  % 位置8 → (3,2)
+    3 3]; % 位置9 → (3,3)
+
+    for i = 1:num_moves
+        move = available_moves(i);
+        row = pos_map(move, 1);
+        col = pos_map(move, 2);
+        new_board = board;
+        
+        new_board(row, col) = -1; % AI落子推演
+        best_score_test = minimaxi(new_board);% 推演后，玩家1给出最佳方案时的净得分
+       
+          if best_score_test < best_score
+                best_score = best_score_test;
+                best_move = move;
+          end
+     end
+end
+
+function best_score_test = minimaxi(new_board)
+    available_moves = find(new_board' == 0);
+    num_moves = length(available_moves);
+    best_score_test = -inf;
+    pos_map = [
+    1 1;  % 位置1 → (1,1)
+    1 2;  % 位置2 → (1,2)
+    1 3;  % 位置3 → (1,3)
+    2 1;  % 位置4 → (2,1)
+    2 2;  % 位置5 → (2,2)
+    2 3;  % 位置6 → (2,3)
+    3 1;  % 位置7 → (3,1)
+    3 2;  % 位置8 → (3,2)
+    3 3]; % 位置9 → (3,3)
+
+    for i = 1:num_moves
+        move = available_moves(i);
+        row = pos_map(move, 1);
+        col = pos_map(move, 2);
+        nnew_board = new_board;
+        
+        nnew_board(row, col) = 1; % 玩家1落子推演
+        [best_score_tes, ~] = evaluateBoard(nnew_board);
+        best_score_testt = best_score_tes(1)-best_score_tes(2);
+          if best_score_testt > best_score_test
+                best_score_test = best_score_testt;
+          end
+     end
+  end
